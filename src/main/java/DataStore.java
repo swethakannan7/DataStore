@@ -1,230 +1,147 @@
-import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 import java.io.*;
-import java.util.Iterator;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.Semaphore;
 
 public class DataStore {
-    String filename;
-    int maxlength = 32;
-    int ttl=0;
-    static String DataStorefilepath = "Untitled";
-
-    public static void main(String[] args) throws IOException, ParseException {
-
-
+    public static void main(String args[]) throws Exception {
+        String key, dataFilepath, JSONFilepath;
+        JSONObject jsonObject = new JSONObject();
+        key = "";
+        int maxlength = 32;
+        DataStoreOperations dataStoreOperations = new DataStoreOperations();
+        System.out.println("Enter DataStore file path: ");      //     filepath : /Users/swetha/DataStore/myData
         Scanner user_input = new Scanner(System.in);
+        dataFilepath = user_input.nextLine();
+        
+        File file = dataStoreOperations.getFile(dataFilepath);
 
-        System.out.println("Enter Key: ");
-        String key = user_input.nextLine();
-        if(key.length()>32)
-            key = key.substring(0,32);
+        if (file.length()!=0)
+            dataStoreOperations.makeHashMap(dataFilepath);
 
-        System.out.println("Enter JSON File path: ");
-        String JSONfilepath = user_input.nextLine();
-
-        System.out.println("Enter DataStore filepath: ");
-        DataStorefilepath = user_input.nextLine();
-        if(DataStorefilepath.equals("")){
-            DataStorefilepath = "Untitled";
-        }
-
-        JSONObject getFile = new JSONObject();
-        JSONParser parser = new JSONParser();
-        Object obj = parser.parse(new FileReader(JSONfilepath));
-        getFile =  (JSONObject) obj;
-
-//        System.out.println("Do you want to assign TTL? ");
-//        String option = user_input.nextLine();
-
-//         if(option.equals("Yes")){
-//             System.out.println("Enter TTL? ");
-//             ttl = user_input.nextInt();
-//         }
-//         else
-//             ttl = 0;
-
-        DataStoreOperations d = new DataStoreOperations();
-
-        d.createKey(key, getFile);
-
-        JSONObject result = new JSONObject();
-        System.out.println("Enter key to read: ");
-        String toreadkey = user_input.nextLine();
-        result = d.readKey(toreadkey);
-        System.out.println(result);
-
-        System.out.println("Enter key to delete: ");
-        String todeletekey = user_input.nextLine();
-        d.deleteKey(todeletekey);
-
-    }
-}
-
-class DataStoreOperations {
-    static Semaphore semaphore = new Semaphore(1);
-    DataStore d = new DataStore();
-
-    public void createKey(String key, JSONObject value) throws IOException, ParseException {
-//        if(ttl!=0){
-//            System.out.println("INSIDE TTL OPTION");
-//            DataStoreEssentials d = new DataStoreEssentials();
-//            d.push(key, ttl);
-//        }
-
-        int flag=0;
-        File file = new File(d.DataStorefilepath);
-
-        JSONObject obj = new JSONObject();
-        JSONArray kvpair = new JSONArray();
-
-        obj.put(key,value);
-
-        if(file.length()==0){
-            kvpair.add(obj);
-        }
-
-        else
-        {
-            JSONParser parser = new JSONParser();
-            FileReader reader = new FileReader(d.DataStorefilepath);
-            JSONArray jsonArray = (JSONArray) parser.parse(reader);
-
-            Iterator<?> i = jsonArray.iterator();
-
-            while (i.hasNext()) {
-                JSONObject new_array = (JSONObject) i.next();
-
-                boolean result = new_array.containsKey(key);
-                if(result){
-                    flag = 1;
+        int choice = 0;
+        do{
+            System.out.println("Options \n Enter (1) create, (2) read, (3) delete (4) Exit menu");
+            choice = user_input.nextInt();
+            user_input.nextLine();
+            if(choice==1){
+                System.out.println("Enter key to create: ");
+                key = user_input.nextLine();
+                if (key.length() > maxlength)
+                    key = key.substring(0, maxlength);
+                if(key.isEmpty()){
+                    System.out.println("Invalid key");
                     break;
                 }
+                System.out.println("Enter JSON Object Filepath: ");//           /Users/swetha/JSONData/example_1.json
+                JSONFilepath = user_input.nextLine();
 
-                else {
-                    System.out.println("Does it contain the key" + new_array.containsKey(key));
-                    kvpair.add(new_array);
+                File JSONfile = dataStoreOperations.getFile(JSONFilepath);
+                if(JSONfile.length()>16000 || JSONFilepath.isEmpty()){
+                    System.out.println("File either empty or exceeds size");
+                    break;
                 }
-            }
-            kvpair.add(obj);
-        }
-        if(flag==0){
-            FileWriter file_writer = new FileWriter(file);
-            BufferedWriter bw = new BufferedWriter(file_writer);
-            bw.write(kvpair.toJSONString());
-            bw.close();
-        }
-        else
-            System.out.println("Key already exists");
-
-    }
-
-    public JSONObject readKey(String key) throws IOException, ParseException {
-        int flag = 0;
-        System.out.println(key);
-        JSONParser parser = new JSONParser();
-        JSONObject obj = new JSONObject();
-        try {
-            FileReader reader = new FileReader(d.DataStorefilepath);
-            JSONArray jsonArray = (JSONArray) parser.parse(reader);
-
-            Iterator<?> i = jsonArray.iterator();
-
-            while (i.hasNext()) {
-                obj = (JSONObject) i.next();
-                boolean result = obj.containsKey(key);
-                if(result){
-                    return obj;
-                }
+                dataStoreOperations.createKey(key, JSONFilepath);
             }
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+            else if(choice==2){
 
-        JSONObject message = new JSONObject();
-        message.put(key, "Key doesn't exist");
-        return message;
-    }
-
-    public void deleteKey(String key) throws IOException, ParseException {
-
-        try {
-
-            semaphore.acquire();
-
-            int flag = 0;
-            File file = new File(d.DataStorefilepath);
-
-            JSONObject obj = new JSONObject();
-            JSONArray kvpair = new JSONArray();
-            JSONParser parser = new JSONParser();
-            FileReader reader = new FileReader(d.DataStorefilepath);
-            JSONArray jsonArray = (JSONArray) parser.parse(reader);
-            Iterator<?> i = jsonArray.iterator();
-            try {
-
-                while (i.hasNext()) {
-                    JSONObject new_array = (JSONObject) i.next();
-                    boolean result = new_array.containsKey(key);
-                    if (result) {
-                        flag = 1;
-                        kvpair.remove(key);
-                    } else if (!new_array.isEmpty() && !new_array.containsKey(key))
-                        kvpair.add(new_array);
-
-                }
-                if (flag != 0) {
-                    FileWriter file_writer = new FileWriter(file);
-                    BufferedWriter bw = new BufferedWriter(file_writer);
-                    bw.write(kvpair.toJSONString());
-                    bw.close();
-                } else
-                    System.out.println("Key doesn't exists");
-            } finally {
-                semaphore.release();
+                System.out.println("Enter key to read: ");
+                key = user_input.nextLine();
+                jsonObject = dataStoreOperations.readKey(key);
+                System.out.println("Value: " + jsonObject.toString());
             }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+
+            else if(choice==3){
+
+                System.out.println("Enter key to delete: ");
+                key = user_input.nextLine();
+                dataStoreOperations.deleteKey(key);
+            }
+            else{
+                dataStoreOperations.pushHashMap(dataStoreOperations.dataMap, dataFilepath);
+                choice = 4;
+            }
+
+
+        }while(choice!=4);
+
     }
 }
 
-//class DataStoreEssentials{
-//    Node head;
-//    class Node{
-//        String key;
-//        Date expiryTime;
-//        Node next;
-//        Node(String key, Date expiryTime){
-//            key = key;
-//            expiryTime = expiryTime;
-//            next = null;
-//        }
-//    }
-//
-//    public Date calculateExpiry(int ttl){
-//        System.out.println("INSIDE CALCULATE CALENDAR");
-//        Calendar cal = Calendar.getInstance();
-//        Date now = cal.getTime();
-//        if(ttl==0){
-//
-//        }
-//        cal.add(Calendar.SECOND, ttl);
-//        Date later = cal.getTime();
-//        System.out.println(later);
-//        return later;
-//    }
-//
-//    public void push(String key, int ttl){
-//        System.out.println("INSIDE PUSH");
-//        Date expiry_date = calculateExpiry(ttl);
-//        Node new_node = new Node(key, expiry_date);
-//        new_node.next = head;
-//        head = new_node;
-//    }
-//}
+class DataStoreOperations implements Serializable {
+    String key;
+    JSONObject value = new JSONObject();
+    static Semaphore semaphore = new Semaphore(1);
+    static int flag = 0;
+
+    Map<String, JSONObject> dataMap = new HashMap<String, JSONObject>();
+
+    File getFile(String filepath){
+       File file = new File(filepath);
+       return file;
+    }
+
+    void makeHashMap(String filepath) throws IOException {
+        InputStream is = Files.newInputStream(Paths.get(filepath));
+        ObjectInputStream  op  = new ObjectInputStream(is);
+        Map<String, JSONObject> data = new HashMap<String, JSONObject>();
+        Map<String, JSONObject> data1 = new HashMap<>();
+        try {
+            while (true) {
+                data = (Map<String, JSONObject>) op.readObject();
+                if (data instanceof DataStoreOperations)
+                    break;
+            }
+        } catch (StreamCorruptedException | ClassNotFoundException | EOFException e){
+            System.out.println(" ");
+        }
+        dataMap = data;
+    }
+
+    void createKey(String key, String JSONFilepath) throws IOException, ParseException {
+        JSONParser parser = new JSONParser();
+        Object obj = parser.parse(new FileReader(JSONFilepath));
+        JSONObject value= (JSONObject) obj;
+        dataMap.put(key, value);
+        flag = 1;
+    }
+
+    JSONObject readKey(String key){
+        JSONObject value = new JSONObject();
+        String message = "Key doesn't exist";
+        if(dataMap.containsKey(key)){
+            value = dataMap.get(key);
+        }
+        else {
+            value.put(key, "Key doesn't exist");
+        }
+        return value;
+    }
+
+    void deleteKey(String key){
+        if(dataMap.containsKey(key)){
+            dataMap.remove(key);
+            flag = 1;
+        }
+        else
+            System.out.println("Key doesn't exist");
+    }
+
+    void pushHashMap(Map<String, JSONObject> map, String filepath) throws IOException, InterruptedException {
+        FileOutputStream fileOutputStream = new FileOutputStream(filepath);
+        ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
+        if (flag == 1) {
+            semaphore.acquire();
+            objectOutputStream.writeObject(dataMap);
+            semaphore.release();
+        }
+    }
+}
